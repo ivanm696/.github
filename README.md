@@ -1,7 +1,4 @@
-‎profile/README.md‎
-Original file line number	Diff line number	Diff line change
-@@ -1,15 +0,0 @@
-uLogin/https://github.com/ivanm696 Hi there 👋
+Login/https://github.com/ivanm696 Hi there 👋
 <!--
 **ivanm696/.github** is a ✨ _special_ ✨ repository because its `profile/README.md` (this file) appears on your GitHub profile.
 Here are some ideas to get you started:
