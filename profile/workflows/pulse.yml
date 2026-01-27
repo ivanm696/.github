@@ -1,0 +1,50 @@
+name: System_Pulse_Orchestrator
+
+# Скрипт срабатывает сам каждые 24 часа или когда ты нажимаешь кнопку
+on:
+  schedule:
+    - cron: '0 0 * * *' # Запуск в полночь
+  workflow_dispatch:      # Кнопка для ручного запуска
+
+jobs:
+  refresh_original:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Original
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: System Reset & Injection
+        run: |
+          # Конфигурация твоего "Призрака" для коммитов
+          git config --global user.name "msftgits"
+          git config --global user.email "msftgits@microsoft.com"
+
+          # 1. Очистка: Удаляем временные воркфлоу (кроме этого)
+          find .github/workflows -name "*.yml" ! -name "pulse.yml" -delete
+          
+          # 2. Обновление .env (твоя секретная база)
+          echo "LAST_PULSE=$(date +'%Y-%m-%d %H:%M:%S')" > .env
+          echo "SYSTEM_STATUS=OPERATIONAL" >> .env
+          echo "INTEL_CONTEXT=ACTIVE" >> .env
+
+          # 3. Синхронизация с "Массой"
+          git add .
+          
+          # Проверка: если изменений нет, не спамим коммитами
+          if git diff --staged --quiet; then
+            echo "Система в норме, изменений не требуется."
+          else
+            git commit -m "System Pulse: Refreshing Mass [Automated]"
+            git push origin main
+          fi
+
+      - name: Security Guard (CodeQL)
+        # Если хочешь, чтобы он сразу проверял код на ошибки
+        uses: github/codeql-action/init@v3
+        with:
+          languages: typescript
