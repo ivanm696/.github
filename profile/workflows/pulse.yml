@@ -1,16 +1,19 @@
 name: System_Pulse_Orchestrator
 
-# Скрипт срабатывает сам каждые 24 часа или когда ты нажимаешь кнопку
 on:
+  push:
+    branches: [ main ]
   schedule:
-    - cron: '0 0 * * *' # Запуск в полночь
-  workflow_dispatch:      # Кнопка для ручного запуска
+    - cron: '0 * * * *' # Теперь пульс каждый час, чтобы данные были свежими
+  workflow_dispatch:
 
 jobs:
   refresh_original:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout Original
@@ -18,33 +21,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Mass Infrastructure Scan
+        run: |
+          echo "📡 Сканирование Массы (microsoft/vscode)..."
+          # Получаем дату последнего движения в VS Code
+          MASS_DATE=$(curl -s https://api.github.com/repos/microsoft/vscode/commits/main | grep '"date":' | head -n 1 | sed 's/[^0-9T:-]//g')
+          echo "MASS_LAST_ACTIVITY=$MASS_DATE" >> $GITHUB_ENV
+          # Создаем JSON для сайта
+          echo "{\"last_pulse\": \"$MASS_DATE\", \"status\": \"OPERATIONAL\", \"origin\": \"msftgits-legacy\"}" > status.json
+
       - name: System Reset & Injection
         run: |
-          # Конфигурация твоего "Призрака" для коммитов
           git config --global user.name "msftgits"
           git config --global user.email "msftgits@microsoft.com"
 
-          # 1. Очистка: Удаляем временные воркфлоу (кроме этого)
-          find .github/workflows -name "*.yml" ! -name "pulse.yml" -delete
-          
-          # 2. Обновление .env (твоя секретная база)
+          # Обновление твоей секретной базы .env
           echo "LAST_PULSE=$(date +'%Y-%m-%d %H:%M:%S')" > .env
+          echo "MASS_PULSE=${{ env.MASS_LAST_ACTIVITY }}" >> .env
           echo "SYSTEM_STATUS=OPERATIONAL" >> .env
-          echo "INTEL_CONTEXT=ACTIVE" >> .env
 
-          # 3. Синхронизация с "Массой"
           git add .
-          
-          # Проверка: если изменений нет, не спамим коммитами
           if git diff --staged --quiet; then
-            echo "Система в норме, изменений не требуется."
+            echo "Изменений нет."
           else
-            git commit -m "System Pulse: Refreshing Mass [Automated]"
+            git commit -m "🌀 System Pulse: Integrated Mass Activity [${{ env.MASS_LAST_ACTIVITY }}]"
             git push origin main
           fi
 
-      - name: Security Guard (CodeQL)
-        # Если хочешь, чтобы он сразу проверял код на ошибки
-        uses: github/codeql-action/init@v3
+      # --- Секция публикации на твой сайт ---
+      - name: Build and Upload Pages
+        uses: actions/jekyll-build-pages@v1
         with:
-          languages: typescript
+          source: ./
+          destination: ./_site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
